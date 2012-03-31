@@ -18,17 +18,20 @@
 #include <iostream>
 #include <sstream>
 #include <pthread.h>
+#include <sox.h>
 
-using namespace std;
-int *opt = new int[6];
+const int msize = 1000;
+
 
 void * monServer(void *arg)
 {
-    char *buf = new char[30];
+    FILE *sox;
+    sox = popen("play '-'","w");
+    char *buf = (char*)malloc(msize * sizeof(char));
     int sfd = *((int*)arg);
     int n;
     listen(sfd,5);
-    printf("Monitor Server Running\n");
+    printf("VoIP Server Running\n");
     for (;;) 
     {
         int session_fd = accept(sfd, 0, 0);
@@ -36,8 +39,10 @@ void * monServer(void *arg)
             printf("Error trying to accept connection\n");
         else
         {
-            n = recv(session_fd, buf, 30*sizeof(*buf), 0);
-            printf("Comentario provicional numero de caracteres recividos: %d",n);
+            printf("A new VoIP chat has started\n");
+            while((n = recv(session_fd, buf, 1, 0)) > 0)
+                fprintf(sox, "%c", *buf);
+            printf("VoIP chat finished\n");
         }
         
     }
@@ -45,24 +50,19 @@ void * monServer(void *arg)
 
 int main(int argc, char** argv)
 {
-    pthread_t pt;                            // Thread for Server 
-    const int BUF_SIZE = 500;                
+    FILE *sox;
+    char *buff  = (char*)malloc(sizeof(char));
+    char *voice = (char*)malloc(msize * sizeof(char));
+    char *addr = (char*)malloc(40 * sizeof(char));
+    char *port = (char*)malloc(6  * sizeof(char));
+    pthread_t pt;                            // Thread for Server         
     struct addrinfo hints;
     struct addrinfo *result, *rp;
     int rsfd;                              // remote socket file descriptor
     int lsfd;                              // local socket file descriptor
-    int s, n;
-    char buf[BUF_SIZE];
-     
-    for(int i = 0; i < 6; i++)
-        *(opt + i) = 0;
-
-    if (argc != 2)                          // Local port used for own server
-    {                                       
-        printf("Not enough Parameters\n");  
-        exit(EXIT_FAILURE);
-    }
-
+    int s;
+    int i;
+    
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_family    = AF_UNSPEC;              // Allow IPv4 or IPv6 
     hints.ai_socktype  = SOCK_STREAM;            // TCP 
@@ -71,8 +71,6 @@ int main(int argc, char** argv)
     hints.ai_canonname = NULL;
     hints.ai_addr      = NULL;
     hints.ai_next      = NULL;
-
-    
     
     /* Setting up Server */
     s = getaddrinfo(NULL, argv[1], &hints, &result);
@@ -96,6 +94,7 @@ int main(int argc, char** argv)
             break;                                              
         close(lsfd);
     }
+    
     if (rp == NULL) {                                          /* No address succeeded */
         fprintf(stderr, "Could not bind\n");
         exit(EXIT_FAILURE);
@@ -104,10 +103,60 @@ int main(int argc, char** argv)
     // The server start to run on a separate thread
     pthread_create(&pt, NULL, monServer, &lsfd);   
     
-    
-    // TODO
-    // An easy way to give a server IP, port
+    for(;;)
+    {
+        printf("IP Address: ");
+        scanf("%s",addr);
+        printf("Port Server: ");
+        scanf("%s",port);
+        
+        printf("addr: %s port: %s\n",addr, port);
+        
+        s = getaddrinfo(addr, port, &hints, &result);
+        
+        if (s != 0) 
+        {
+            fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+            exit(EXIT_FAILURE);
+        }
+  
+        for (rp = result; rp != NULL; rp = rp->ai_next)
+        {
+            rsfd = socket(rp->ai_family, rp->ai_socktype,
+                rp->ai_protocol);
+            if (rsfd == -1)
+                continue;
+            if (connect(rsfd, rp->ai_addr, rp->ai_addrlen) != -1)
+                break;                                              // Success 
+            close(rsfd);
+        }
+        
+        if (rp == NULL)  // No address succeeded 
+        {
+            fprintf(stderr, "Could not connect\n");
+            exit(EXIT_FAILURE);
+        }
+        
+        pid_t pid;
+        int fd[2];
+        pipe(fd);
+        pid = fork();
+        if(pid == 0)
+        {
+            dup2(fd[1],1);
+            execlp("rec", "rec","-r 10k", "-p", NULL);
+            perror("exec");
+            _exit(127);
+        }
+        printf("descriptor %d\n",fd[1]);
+        for(;;)
+        {
+            read(fd[0], buff, 1);
+            send(rsfd, buff, 1, 0);
+        }
 
+    }
+    
     return 0;
 }
 
