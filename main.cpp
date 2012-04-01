@@ -20,13 +20,22 @@
 #include <pthread.h>
 #include <sox.h>
 
-const int msize = 1000;
+const int msize = 10000;
 
 
 void * monServer(void *arg)
 {
-    FILE *sox;
-    sox = popen("play '-'","w");
+    int fd[2];
+    pipe(fd);
+    pid_t pid;
+    pid = fork();
+    if(pid == 0)
+    {
+        dup2(fd[0],0);
+        execlp("play", "play","-", NULL);
+        perror("exec");
+        _exit(127);
+    }
     char *buf = (char*)malloc(msize * sizeof(char));
     int sfd = *((int*)arg);
     int n;
@@ -40,8 +49,8 @@ void * monServer(void *arg)
         else
         {
             printf("A new VoIP chat has started\n");
-            while((n = recv(session_fd, buf, 1, 0)) > 0)
-                fprintf(sox, "%c", *buf);
+            while((n = recv(session_fd, buf, msize, 0)) > 0)
+                write(fd[1], buf, msize);
             printf("VoIP chat finished\n");
         }
         
@@ -50,7 +59,6 @@ void * monServer(void *arg)
 
 int main(int argc, char** argv)
 {
-    FILE *sox;
     char *buff  = (char*)malloc(sizeof(char));
     char *voice = (char*)malloc(msize * sizeof(char));
     char *addr = (char*)malloc(40 * sizeof(char));
@@ -62,6 +70,7 @@ int main(int argc, char** argv)
     int lsfd;                              // local socket file descriptor
     int s;
     int i;
+    int n = 0;
     
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_family    = AF_UNSPEC;              // Allow IPv4 or IPv6 
@@ -144,15 +153,21 @@ int main(int argc, char** argv)
         if(pid == 0)
         {
             dup2(fd[1],1);
-            execlp("rec", "rec","-r 10k", "-p", NULL);
+            execlp("rec", "rec","-r 7k", "-p", NULL);
             perror("exec");
             _exit(127);
         }
         printf("descriptor %d\n",fd[1]);
         for(;;)
         {
-            read(fd[0], buff, 1);
-            send(rsfd, buff, 1, 0);
+            for(i = 0; i < msize; i++)
+            {
+                read(fd[0], buff, 1);
+                *(voice + i) = *buff;
+            }
+            printf("sending voip %d\n", n++);
+            fflush(stdout);
+            send(rsfd, voice, msize, 0);
         }
 
     }
