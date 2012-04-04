@@ -6,7 +6,7 @@
  * Created on March 24, 2012, 4:08 PM
  */
 
-#include <cstdlib>
+#include <cstdlib> 
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,15 +15,19 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
-#include <iostream>
-#include <sstream>
+#include <iostream> 
+#include <sstream> 
 #include <pthread.h>
 
-const int msize = 10000;
+const int msize = 512;
 
 
 void * monServer(void *arg)
 {
+    struct sockaddr_storage peer_addr;
+    socklen_t peer_addr_len;
+
+    int nread;
     int fd[2];
     pipe(fd);
     pid_t pid;
@@ -37,22 +41,14 @@ void * monServer(void *arg)
     }
     char *buf = (char*)malloc(msize * sizeof(char));
     int sfd = *((int*)arg);
-    int n;
-    listen(sfd,5);
-    printf("VoIP Server Running\n");
-    for (;;) 
+    printf("\nVoIP Server Running\n");
+    for(;;)
     {
-        int session_fd = accept(sfd, 0, 0);
-        if(session_fd == -1)                  // session Error
-            printf("Error trying to accept connection\n");
-        else
-        {
-            printf("A new VoIP chat has started\n");
-            while((n = recv(session_fd, buf, msize, 0)) > 0)
-                write(fd[1], buf, msize);
-            printf("VoIP chat finished\n");
-        }
-        
+        peer_addr_len = sizeof(struct sockaddr_storage);
+        nread = recvfrom(sfd, buf, msize, 0, (struct sockaddr *) &peer_addr, &peer_addr_len);
+        if(nread == -1)
+            continue;
+        write(fd[1], buf, msize);
     }
 }
 
@@ -73,7 +69,7 @@ int main(int argc, char** argv)
     
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_family    = AF_UNSPEC;              // Allow IPv4 or IPv6 
-    hints.ai_socktype  = SOCK_STREAM;            // TCP 
+    hints.ai_socktype  = SOCK_DGRAM;            // UDP 
     hints.ai_flags     = AI_PASSIVE;             // For wildcard IP address   
     hints.ai_protocol  = 0;                      // Any protocol
     hints.ai_canonname = NULL;
@@ -107,6 +103,8 @@ int main(int argc, char** argv)
         fprintf(stderr, "Could not bind\n");
         exit(EXIT_FAILURE);
     }
+    
+    freeaddrinfo(result);
     
     // The server start to run on a separate thread
     pthread_create(&pt, NULL, monServer, &lsfd);   
