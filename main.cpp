@@ -18,7 +18,6 @@
 #include <iostream>
 #include <sstream>
 #include <pthread.h>
-#include <sox.h>
 
 const int msize = 10000;
 
