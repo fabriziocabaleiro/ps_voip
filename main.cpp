@@ -15,11 +15,11 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
-#include <iostream> 
+#include <iostream>   
 #include <sstream> 
 #include <pthread.h>
 
-const int msize = 512;
+const int msize = 20000;
 
 
 void * monServer(void *arg)
@@ -150,7 +150,7 @@ int main(int argc, char** argv)
         if(pid == 0)
         {
             dup2(fd[1],1);
-            execlp("rec", "rec","-r 7k", "-p", NULL);
+            execlp("rec", "rec","-p", NULL);
             perror("exec");
             _exit(127);
         }
