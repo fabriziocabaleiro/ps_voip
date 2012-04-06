@@ -24,17 +24,19 @@ const int msize = 10000;
 
 void * monServer(void *arg)
 {
-    int fd[2];
-    pipe(fd);
-    pid_t pid;
-    pid = fork();
-    if(pid == 0)
-    {
-        dup2(fd[0],0);
-        execlp("play", "play","-", NULL);
-        perror("exec");
-        _exit(127);
-    }
+//    int fd[2];
+//    pipe(fd);
+//    pid_t pid;
+//    pid = fork();
+//    if(pid == 0)
+//    {
+//        dup2(fd[0],0);
+//        execlp("play", "play","-q","-", NULL);
+//        perror("exec");
+//        _exit(127);
+//    }
+    FILE *pfd;
+    pfd = popen("./decoder | aplay -c 1 -f S16_LE -r 8000 -F 30000 --period-size=6 --buffer-size=240","w");
     char *buf = (char*)malloc(msize * sizeof(char));
     int sfd = *((int*)arg);
     int n;
@@ -49,7 +51,7 @@ void * monServer(void *arg)
         {
             printf("A new VoIP chat has started\n");
             while((n = recv(session_fd, buf, msize, 0)) > 0)
-                write(fd[1], buf, msize);
+//                write(fd[1], buf, msize);
             printf("VoIP chat finished\n");
         }
         
@@ -58,6 +60,7 @@ void * monServer(void *arg)
 
 int main(int argc, char** argv)
 {
+    FILE *pfd;
     char *buff  = (char*)malloc(sizeof(char));
     char *voice = (char*)malloc(msize * sizeof(char));
     char *addr = (char*)malloc(40 * sizeof(char));
@@ -145,25 +148,27 @@ int main(int argc, char** argv)
             exit(EXIT_FAILURE);
         }
         
-        pid_t pid;
-        int fd[2];
-        pipe(fd);
-        pid = fork();
-        if(pid == 0)
-        {
-            dup2(fd[1],1);
-            execlp("rec", "rec","-r 7k", "-p", NULL);
-            perror("exec");
-            _exit(127);
-        }
-        printf("descriptor %d\n",fd[1]);
+//        pid_t pid;
+//        int fd[2];
+//        pipe(fd);
+//        pid = fork();
+//        if(pid == 0)
+//        {
+//            dup2(fd[1],1);
+//            execlp("rec", "rec","-q","-r 7k", "-p", NULL);
+//            perror("exec");
+//            _exit(127);
+//        }
+        pfd = popen("arecord -c 1 -f S16_LE -r 8000 -F 30000 --period-size=6 --buffer-size=240 | ./encoder","r");
+
         for(;;)
         {
             for(i = 0; i < msize; i++)
             {
-                read(fd[0], buff, 1);
-                *(voice + i) = *buff;
+//                read(fd[0], buff, 1);
+//                *(voice + i) = *buff;
             }
+            fread(voice, sizeof(char), msize, pfd);
             printf("sending voip %d\n", n++);
             fflush(stdout);
             send(rsfd, voice, msize, 0);
