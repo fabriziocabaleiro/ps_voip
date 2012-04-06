@@ -19,7 +19,7 @@
 #include <sstream> 
 #include <pthread.h>
 
-const int msize = 500;
+const int msize = 30;
 
 
 void * monServer(void *arg)
