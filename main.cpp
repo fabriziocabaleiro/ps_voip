@@ -159,7 +159,7 @@ void decode(struct parameters *param, char **argv, int argc)
 {
     int i;
     param->addr = NULL;
-    param->lport = NULL;
+    param->lport = (char*)"6661";
     param->rport = NULL;
     param->testing = 0;
     param->msize = 500;
