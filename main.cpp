@@ -22,7 +22,7 @@ struct ptData
 {
     int  sfd;
     int testing;
-    int *rdy;
+    int rdy;
     int  msize;
 };
 
@@ -32,6 +32,7 @@ struct parameters
     char *rport;
     char *addr;
     int  testing;
+    int  msize;
 };
 
 void * monServer(void *arg)
@@ -46,7 +47,7 @@ void * monServer(void *arg)
     char *buf = (char*)malloc(ptdata->msize * sizeof(char));
     
     printf("VoIP Server Running\n");
-    *ptdata->rdy = 1;
+    ptdata->rdy = 1;
     for(;;)
     {
         peer_addr_len = sizeof(struct sockaddr_storage);
@@ -66,19 +67,10 @@ void decode(struct parameters *, char**, int);
 
 int main(int argc, char** argv)
 {
-    struct parameters *ps = (struct parameters*)malloc(sizeof(struct parameters));
     pthread_t pt;                                 // Thread for Server         
     FILE *pfd;                                    //
-    int ready = 0;                                // local server ready
-    int testing = 0;                              // testing mode, various printf enabled
-    const int msize = 240;                        // size of package to be sent by internet
     struct ptData *ptdata = (struct ptData *)malloc(sizeof(struct ptData));
-    ptdata->msize = msize;
-    ptdata->rdy   = &ready;
-    
-    decode(ps, argv, argc);
-    
-    char *voice = (char*)malloc(msize * sizeof(char));
+    struct parameters *ps = (struct parameters*)malloc(sizeof(struct parameters));
     
     struct addrinfo hints;
     struct addrinfo *result, *rp;
@@ -87,7 +79,12 @@ int main(int argc, char** argv)
     int s;
     int n = 0;
     
-        
+    decode(ps, argv, argc);                       // decode input parameters from command line
+    ptdata->testing = ps->testing;
+    ptdata->msize = ps->msize;
+    ptdata->rdy   = 0;
+    char *voice = (char*)malloc(ps->msize * sizeof(char));
+    
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_family    = AF_UNSPEC;               // Allow IPv4 or IPv6 
     hints.ai_socktype  = SOCK_DGRAM;              // UDP 
@@ -125,7 +122,7 @@ int main(int argc, char** argv)
     ptdata->sfd = lsfd;
     pthread_create(&pt, NULL, monServer, (void*)ptdata);   
     
-    while(!*ptdata->rdy)
+    while(! ptdata->rdy)
         usleep(1000);
     for(;;)
     {
@@ -169,13 +166,13 @@ int main(int argc, char** argv)
 
         for(;;)
         {
-            fread(voice, sizeof(char), msize, pfd);
-            if(testing)
+            fread(voice, sizeof(char), ps->msize, pfd);
+            if(ps->testing)
             {
                 printf("sending voip %d\n", n++);
                 fflush(stdout);
             }
-            send(rsfd, voice, msize, 0);
+            send(rsfd, voice, ps->msize, 0);
         }
 
     }
@@ -190,6 +187,7 @@ void decode(struct parameters *param, char **argv, int argc)
     param->lport = NULL;
     param->rport = NULL;
     param->testing = 0;
+    param->msize = 500;
     for(i = 1; i < argc; i++)
     {
         if(!strcmp(*(argv + i), "-lp"))
@@ -204,5 +202,7 @@ void decode(struct parameters *param, char **argv, int argc)
         if(!strcmp(*(argv + i), "-t"))
             param->testing = 1;
         
+        if(!strcmp(*(argv + i), "-s"))
+            param->msize = atoi(*(argv + i + 1));
     }
 }
