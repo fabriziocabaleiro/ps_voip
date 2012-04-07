@@ -15,84 +15,97 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
-#include <iostream>   
-#include <sstream> 
 #include <pthread.h>
 
-const int msize = 30;
+
+struct ptData
+{
+    int  sfd;
+    int testing;
+    int *rdy;
+    int  msize;
+};
+
+struct parameters
+{
+    char *lport;
+    char *rport;
+    char *addr;
+    int  testing;
+};
 
 void * monServer(void *arg)
 {
-//    int fd[2];
-//    pipe(fd);
-//    pid_t pid;
-//    pid = fork();
-//    if(pid == 0)
-//    {
-//        dup2(fd[0],0);
-//        execlp("play", "play","-q","-", NULL);
-//        perror("exec");
-//        _exit(127);
-//    }
+    struct ptData *ptdata = (struct ptData*)arg;
+    int n = 0;
     FILE *pfd;
     pfd = popen("./decoder | aplay -c 1 -f S16_LE -r 8000 -F 30000 --period-size=6 --buffer-size=240","w");
     struct sockaddr_storage peer_addr;
     socklen_t peer_addr_len;
-
     int nread;
+    char *buf = (char*)malloc(ptdata->msize * sizeof(char));
     
-    char *buf = (char*)malloc(msize * sizeof(char));
-    int sfd = *((int*)arg);
-    printf("\nVoIP Server Running\n");
+    printf("VoIP Server Running\n");
+    *ptdata->rdy = 1;
     for(;;)
     {
         peer_addr_len = sizeof(struct sockaddr_storage);
-        nread = recvfrom(sfd, buf, msize, 0, (struct sockaddr *) &peer_addr, &peer_addr_len);
+        nread = recvfrom(ptdata->sfd, buf, ptdata->msize, 0, (struct sockaddr *) &peer_addr, &peer_addr_len);
         if(nread == -1)
             continue;
-        fwrite(buf, sizeof(char), msize, pfd);
-//        write(fd[1], buf, msize);
+        fwrite(buf, sizeof(char), ptdata->msize, pfd);
+        if(ptdata->testing)
+        {
+            printf("Sending message %d\n",++n);
+            fflush(stdout);
+        }
     }
 }
 
+void decode(struct parameters *, char**, int);
+
 int main(int argc, char** argv)
 {
-    FILE *pfd;
-    char *buff  = (char*)malloc(sizeof(char));
+    struct parameters *ps = (struct parameters*)malloc(sizeof(struct parameters));
+    pthread_t pt;                                 // Thread for Server         
+    FILE *pfd;                                    //
+    int ready = 0;                                // local server ready
+    int testing = 0;                              // testing mode, various printf enabled
+    const int msize = 240;                        // size of package to be sent by internet
+    struct ptData *ptdata = (struct ptData *)malloc(sizeof(struct ptData));
+    ptdata->msize = msize;
+    ptdata->rdy   = &ready;
+    
+    decode(ps, argv, argc);
+    
     char *voice = (char*)malloc(msize * sizeof(char));
-    char *addr = (char*)malloc(40 * sizeof(char));
-    char *port = (char*)malloc(6  * sizeof(char));
-    pthread_t pt;                            // Thread for Server         
+    
     struct addrinfo hints;
     struct addrinfo *result, *rp;
-    int rsfd;                              // remote socket file descriptor
-    int lsfd;                              // local socket file descriptor
+    int rsfd;                                     // remote socket file descriptor
+    int lsfd;                                     // local socket file descriptor
     int s;
-    int i;
     int n = 0;
     
+        
     memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family    = AF_UNSPEC;              // Allow IPv4 or IPv6 
-    hints.ai_socktype  = SOCK_DGRAM;            // UDP 
-    hints.ai_flags     = AI_PASSIVE;             // For wildcard IP address   
-    hints.ai_protocol  = 0;                      // Any protocol
+    hints.ai_family    = AF_UNSPEC;               // Allow IPv4 or IPv6 
+    hints.ai_socktype  = SOCK_DGRAM;              // UDP 
+    hints.ai_flags     = AI_PASSIVE;              // For wildcard IP address   
+    hints.ai_protocol  = 0;                       // Any protocol
     hints.ai_canonname = NULL;
     hints.ai_addr      = NULL;
     hints.ai_next      = NULL;
     
-    /* Setting up Server */
-    s = getaddrinfo(NULL, argv[1], &hints, &result);
+                                                  // Setting up Server 
+    s = getaddrinfo(NULL, ps->lport, &hints, &result);
     if (s != 0) 
     {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
         exit(EXIT_FAILURE);
     }
 
-    /*  * getaddrinfo() returns a list of address structures.     *
-        * Try each address until we successfully bind(2).         *
-        * If socket(2) (or bind(2)) fails, we (close the socket   *
-        * and) try the next address.                              */
-
+                                                  // get socket and bind it
     for (rp = result; rp != NULL; rp = rp->ai_next) 
     {
         lsfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
@@ -103,26 +116,31 @@ int main(int argc, char** argv)
         close(lsfd);
     }
     
-    if (rp == NULL) {                                          /* No address succeeded */
+    if (rp == NULL) {                             // No address succeeded 
         fprintf(stderr, "Could not bind\n");
         exit(EXIT_FAILURE);
     }
     
     freeaddrinfo(result);
+    ptdata->sfd = lsfd;
+    pthread_create(&pt, NULL, monServer, (void*)ptdata);   
     
-    // The server start to run on a separate thread
-    pthread_create(&pt, NULL, monServer, &lsfd);   
-    
+    while(!*ptdata->rdy)
+        usleep(1000);
     for(;;)
     {
-        printf("IP Address: ");
-        scanf("%s",addr);
-        printf("Port Server: ");
-        scanf("%s",port);
+        if(ps->addr == NULL)
+        {
+            printf("IP Address: ");
+            scanf("%s",ps->addr);
+        }
+        if(ps->rport == NULL)
+        {
+            printf("Port Server: ");
+            scanf("%s",ps->rport);
+        }
         
-        printf("addr: %s port: %s\n",addr, port);
-        
-        s = getaddrinfo(addr, port, &hints, &result);
+        s = getaddrinfo(ps->addr, ps->rport, &hints, &result);
         
         if (s != 0) 
         {
@@ -147,29 +165,16 @@ int main(int argc, char** argv)
             exit(EXIT_FAILURE);
         }
         
-//        pid_t pid;
-//        int fd[2];
-//        pipe(fd);
-//        pid = fork();
-//        if(pid == 0)
-//        {
-//            dup2(fd[1],1);
-//            execlp("rec", "rec","-q","-r 7k", "-p", NULL);
-//            perror("exec");
-//            _exit(127);
-//        }
         pfd = popen("arecord -c 1 -f S16_LE -r 8000 -F 30000 --period-size=6 --buffer-size=240 | ./encoder","r");
 
         for(;;)
         {
-            for(i = 0; i < msize; i++)
-            {
-//                read(fd[0], buff, 1);
-//                *(voice + i) = *buff;
-            }
             fread(voice, sizeof(char), msize, pfd);
-            printf("sending voip %d\n", n++);
-            fflush(stdout);
+            if(testing)
+            {
+                printf("sending voip %d\n", n++);
+                fflush(stdout);
+            }
             send(rsfd, voice, msize, 0);
         }
 
@@ -178,3 +183,26 @@ int main(int argc, char** argv)
     return 0;
 }
 
+void decode(struct parameters *param, char **argv, int argc)
+{
+    int i;
+    param->addr = NULL;
+    param->lport = NULL;
+    param->rport = NULL;
+    param->testing = 0;
+    for(i = 1; i < argc; i++)
+    {
+        if(!strcmp(*(argv + i), "-lp"))
+            param->lport = *(argv + i + 1);
+        
+        if(!strcmp(*(argv + i), "-rp"))
+            param->rport = *(argv + i + 1);
+        
+        if(!strcmp(*(argv + i), "-a"))
+            param->addr = *(argv + i + 1);
+        
+        if(!strcmp(*(argv + i), "-t"))
+            param->testing = 1;
+        
+    }
+}
