@@ -152,7 +152,7 @@ int main(int argc, char** argv)
         }
         
         if(! strcmp(ps->audio,"alsa"))
-            sprintf(cmd,"arecord -c 1 -f S16_LE -r %s -F 30000 --period-size=6 --buffer-size=240 | ./encoder/encoder",ps->br);
+            sprintf(cmd,"arecord -t raw -c 1 -f S16_LE -r 8000 -B 30000 | ./encoder/encoder",ps->br);
         else if(! strcmp(ps->audio,"sox"))
             sprintf(cmd,"rec -r %s -q -p",ps->br);
         pfd = popen(cmd,"r");
@@ -164,6 +164,7 @@ int main(int argc, char** argv)
             {
                 printf("sending voip %d\n", n++);
                 fflush(stdout);
+                fflush(pfd);
             }
             send(rsfd, voice, ps->msize, 0);
         }
@@ -228,7 +229,7 @@ void * localServer(void *arg)
     int n = 0;
     FILE *pfd;
     if(! strcmp(ptdata->audio,"alsa"))
-        sprintf(cmd,"./decoder/decoder | aplay -c 1 -f S16_LE -r %s -F 30000 --period-size=6 --buffer-size=240",ptdata->br);
+        sprintf(cmd,"./decoder/decoder | aplay -c 1 -f S16_LE -r 8000 -B 30000",ptdata->br);
     else if(! strcmp(ptdata->audio,"sox"))
         sprintf(cmd,"play -q -r %s -",ptdata->br);
     pfd = popen(cmd,"w");
@@ -249,6 +250,7 @@ void * localServer(void *arg)
         if(ptdata->testing)
         {
             printf("Receiving message %d\n",++n);
+            fflush(pfd);
             fflush(stdout);
         }
         if(*ptdata->wait)
