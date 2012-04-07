@@ -136,7 +136,7 @@ int main(int argc, char** argv)
             exit(EXIT_FAILURE);
         }
         
-        pfd = popen("arecord -c 1 -f S16_LE -r 8000 -F 30000 --period-size=6 --buffer-size=240 | ./encoder","r");
+        pfd = popen("arecord -c 1 -f S16_LE -r 48000 -F 30000 --period-size=6 --buffer-size=240 | ./encoder","r");
 
         for(;;)
         {
@@ -191,7 +191,7 @@ void * localServer(void *arg)
     struct ptData *ptdata = (struct ptData*)arg;
     int n = 0;
     FILE *pfd;
-    pfd = popen("./decoder | aplay -c 1 -f S16_LE -r 8000 -F 30000 --period-size=6 --buffer-size=240","w");
+    pfd = popen("./decoder | aplay -c 1 -f S16_LE -r 48000 -F 30000 --period-size=6 --buffer-size=240","w");
     struct sockaddr_storage peer_addr;
     socklen_t peer_addr_len;
     int nread;
@@ -208,7 +208,7 @@ void * localServer(void *arg)
         fwrite(buf, sizeof(char), ptdata->msize, pfd);
         if(ptdata->testing)
         {
-            printf("Sending message %d\n",++n);
+            printf("Receiving message %d\n",++n);
             fflush(stdout);
         }
     }
