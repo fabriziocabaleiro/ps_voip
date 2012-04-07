@@ -20,21 +20,25 @@
 
 struct ptData
 {
-    int  sfd;
-    int testing;
-    int rdy;
-    int  msize;
-    char *audio;
+    char *br;       // sample bit rate
+    int  sfd;       // socket file descriptor for server
+    int  *wait;     // wait option to wait the other person to set his server
+    int  testing;   // print info for testing
+    int  rdy;       // true when server is ready
+    int  msize;     // size of data to be sent
+    char *audio;    // set audio program
 };
 
 struct parameters
 {
-    char *audio;
-    char *lport;
-    char *rport;
-    char *addr;
-    int  testing;
-    int  msize;
+    char *br;       // sample bit rate
+    char *audio;    // set audio program
+    char *lport;    // local port
+    char *rport;    // remote port
+    char *addr;     // address
+    int  testing;   // print info for testing
+    int  msize;     // size of data to be sent
+    int  wait;      // wait option to wait the other person to set his server
 };
 
 void *localServer(void *arg);
@@ -46,10 +50,10 @@ int main(int argc, char** argv)
     pthread_t pt;                                 // Thread for Server         
     FILE *pfd;                                    //
     struct ptData *ptdata = (struct ptData *)malloc(sizeof(struct ptData));
-    struct parameters *ps = (struct parameters*)malloc(sizeof(struct parameters));
-    
+    struct parameters *ps = (struct parameters*)malloc(sizeof(struct parameters));   
     struct addrinfo hints;
     struct addrinfo *result, *rp;
+    char *cmd = (char*)malloc(200 * sizeof(char));
     int rsfd;                                     // remote socket file descriptor
     int lsfd;                                     // local socket file descriptor
     int s;
@@ -58,8 +62,10 @@ int main(int argc, char** argv)
     decode(ps, argv, argc);                       // decode input parameters from command line
     ptdata->testing = ps->testing;
     ptdata->msize = ps->msize;
+    ptdata->wait  = &ps->wait;
     ptdata->rdy   = 0;
     ptdata->audio = ps->audio;
+    ptdata->br    = ps->br;
     char *voice = (char*)malloc(ps->msize * sizeof(char));
     
     memset(&hints, 0, sizeof(struct addrinfo));
@@ -113,6 +119,8 @@ int main(int argc, char** argv)
             printf("Port Server: ");
             scanf("%s",ps->rport);
         }
+        while(ps->wait)
+            usleep(100000);
         
         s = getaddrinfo(ps->addr, ps->rport, &hints, &result);
         
@@ -140,9 +148,10 @@ int main(int argc, char** argv)
         }
         
         if(! strcmp(ps->audio,"alsa"))
-            pfd = popen("arecord -c 1 -f S16_LE -r 48000 -F 30000 --period-size=6 --buffer-size=240 | ./encoder/encoder","r");
+            sprintf(cmd,"arecord -c 1 -f S16_LE -r %s -F 30000 --period-size=6 --buffer-size=240 | ./encoder/encoder",ps->br);
         else if(! strcmp(ps->audio,"sox"))
-            pfd = popen("rec -p","r");
+            sprintf(cmd,"rec -r %s -q -p",ps->br);
+        pfd = popen(cmd,"r");
 
         for(;;)
         {
@@ -164,12 +173,14 @@ int main(int argc, char** argv)
 void decode(struct parameters *param, char **argv, int argc)
 {
     int i;
+    param->wait  = 0;
     param->audio = (char*)"alsa";
-    param->addr = NULL;
+    param->br    = (char*)"10000";
+    param->addr  = NULL;
     param->lport = (char*)"6661";
     param->rport = NULL;
-    param->testing = 0;
     param->msize = 500;
+    param->testing = 0;
     for(i = 1; i < argc; i++)
     {
         if(!strcmp(*(argv + i), "-lp"))
@@ -181,8 +192,14 @@ void decode(struct parameters *param, char **argv, int argc)
         if(!strcmp(*(argv + i), "-ad"))
             param->addr = *(argv + i + 1);
         
+        if(!strcmp(*(argv + i), "-r"))
+            param->br = *(argv + i + 1);
+        
         if(!strcmp(*(argv + i), "-t"))
             param->testing = 1;
+        
+        if(!strcmp(*(argv + i), "-w"))
+            param->wait = 1;
         
         if(!strcmp(*(argv + i), "-s"))
             param->msize = atoi(*(argv + i + 1));
@@ -198,13 +215,15 @@ void decode(struct parameters *param, char **argv, int argc)
 // Local server for receiving audio
 void * localServer(void *arg)
 {
+    char *cmd = (char*)malloc(200 * sizeof(char));
     struct ptData *ptdata = (struct ptData*)arg;
     int n = 0;
     FILE *pfd;
     if(! strcmp(ptdata->audio,"alsa"))
-        pfd = popen("./decoder/decoder | aplay -c 1 -f S16_LE -r 48000 -F 30000 --period-size=6 --buffer-size=240","w");
+        sprintf(cmd,"./decoder/decoder | aplay -c 1 -f S16_LE -r %s -F 30000 --period-size=6 --buffer-size=240",ptdata->br);
     else if(! strcmp(ptdata->audio,"sox"))
-        pfd = popen("play -","w");
+        sprintf(cmd,"play -q -r %s -",ptdata->br);
+    pfd = popen(cmd,"w");
     struct sockaddr_storage peer_addr;
     socklen_t peer_addr_len;
     int nread;
@@ -224,6 +243,8 @@ void * localServer(void *arg)
             printf("Receiving message %d\n",++n);
             fflush(stdout);
         }
+        if(*ptdata->wait)
+            *ptdata->wait = 0;
     }
 }
 
@@ -234,7 +255,8 @@ void help()
     printf("\t-lp    local port\n");
     printf("\t-rp    remote port\n");
     printf("\t-ad    remote address\n");
-    printf("\t-s     msize\n");
+    printf("\t-s     msize, this determinate the package size to be sent through internet\n");
+    printf("\t-w     wait to the other person to start his server\n");
     printf("\t-au    select between alsa or sox\n");
     printf("\t-t     running testing mode\n");
     printf("\t-h     display this help\n");
