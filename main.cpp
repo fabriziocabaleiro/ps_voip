@@ -24,10 +24,12 @@ struct ptData
     int testing;
     int rdy;
     int  msize;
+    char *audio;
 };
 
 struct parameters
 {
+    char *audio;
     char *lport;
     char *rport;
     char *addr;
@@ -57,6 +59,7 @@ int main(int argc, char** argv)
     ptdata->testing = ps->testing;
     ptdata->msize = ps->msize;
     ptdata->rdy   = 0;
+    ptdata->audio = ps->audio;
     char *voice = (char*)malloc(ps->msize * sizeof(char));
     
     memset(&hints, 0, sizeof(struct addrinfo));
@@ -136,7 +139,10 @@ int main(int argc, char** argv)
             exit(EXIT_FAILURE);
         }
         
-        pfd = popen("arecord -c 1 -f S16_LE -r 48000 -F 30000 --period-size=6 --buffer-size=240 | ./encoder/encoder","r");
+        if(! strcmp(ps->audio,"alsa"))
+            pfd = popen("arecord -c 1 -f S16_LE -r 48000 -F 30000 --period-size=6 --buffer-size=240 | ./encoder/encoder","r");
+        else if(! strcmp(ps->audio,"sox"))
+            pfd = popen("rec -p","r");
 
         for(;;)
         {
@@ -158,6 +164,7 @@ int main(int argc, char** argv)
 void decode(struct parameters *param, char **argv, int argc)
 {
     int i;
+    param->audio = (char*)"alsa";
     param->addr = NULL;
     param->lport = (char*)"6661";
     param->rport = NULL;
@@ -180,6 +187,9 @@ void decode(struct parameters *param, char **argv, int argc)
         if(!strcmp(*(argv + i), "-s"))
             param->msize = atoi(*(argv + i + 1));
         
+        if(!strcmp(*(argv + i), "-audio"))
+            param->audio = *(argv + i + 1);
+        
         if(!strcmp(*(argv + i), "-h"))
             help();
     }
@@ -191,7 +201,10 @@ void * localServer(void *arg)
     struct ptData *ptdata = (struct ptData*)arg;
     int n = 0;
     FILE *pfd;
-    pfd = popen("./decoder/decoder | aplay -c 1 -f S16_LE -r 48000 -F 30000 --period-size=6 --buffer-size=240","w");
+    if(! strcmp(ptdata->audio,"alsa"))
+        pfd = popen("./decoder/decoder | aplay -c 1 -f S16_LE -r 48000 -F 30000 --period-size=6 --buffer-size=240","w");
+    else if(! strcmp(ptdata->audio,"sox"))
+        pfd = popen("play -","w");
     struct sockaddr_storage peer_addr;
     socklen_t peer_addr_len;
     int nread;
@@ -218,11 +231,12 @@ void * localServer(void *arg)
 void help()
 {
     printf("OPTIONS\n");
-    printf("\t-lp  local port\n");
-    printf("\t-rp  remote port\n");
-    printf("\t-a   remote address\n");
-    printf("\t-s   msize\n");
-    printf("\t-t   running testing mode\n");
-    printf("\t-h   display this help\n");
+    printf("\t-lp    local port\n");
+    printf("\t-rp    remote port\n");
+    printf("\t-ad    remote address\n");
+    printf("\t-s     msize\n");
+    printf("\t-au    select between alsa or sox\n");
+    printf("\t-t     running testing mode\n");
+    printf("\t-h     display this help\n");
     exit(EXIT_SUCCESS);
 }
