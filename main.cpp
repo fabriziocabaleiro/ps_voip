@@ -178,7 +178,7 @@ void decode(struct parameters *param, char **argv, int argc)
         if(!strcmp(*(argv + i), "-rp"))
             param->rport = *(argv + i + 1);
         
-        if(!strcmp(*(argv + i), "-a"))
+        if(!strcmp(*(argv + i), "-ad"))
             param->addr = *(argv + i + 1);
         
         if(!strcmp(*(argv + i), "-t"))
@@ -187,7 +187,7 @@ void decode(struct parameters *param, char **argv, int argc)
         if(!strcmp(*(argv + i), "-s"))
             param->msize = atoi(*(argv + i + 1));
         
-        if(!strcmp(*(argv + i), "-audio"))
+        if(!strcmp(*(argv + i), "-au"))
             param->audio = *(argv + i + 1);
         
         if(!strcmp(*(argv + i), "-h"))
@@ -238,5 +238,12 @@ void help()
     printf("\t-au    select between alsa or sox\n");
     printf("\t-t     running testing mode\n");
     printf("\t-h     display this help\n");
+    printf("\n");
+    printf("EXAMPLES\n");
+    printf("\t$ voip -lp <local_port> -s 100 -au sox\n");
+    printf("\tThis will use local_port to leasing, it will send and receive frame of 100 bytes\nand use sox to play and record audio\n\n");
+    printf("\t$ voip -lp <local_port> -s 100 -au alsa -rp <remote_port> -ad <address>\n");
+    printf("\tThis is similar to the first one, but it is using alsa for recording and playing audio\nand it sends data to the address:remote_port\n");
+    printf("");
     exit(EXIT_SUCCESS);
 }
