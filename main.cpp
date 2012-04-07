@@ -35,35 +35,9 @@ struct parameters
     int  msize;
 };
 
-void * monServer(void *arg)
-{
-    struct ptData *ptdata = (struct ptData*)arg;
-    int n = 0;
-    FILE *pfd;
-    pfd = popen("./decoder | aplay -c 1 -f S16_LE -r 8000 -F 30000 --period-size=6 --buffer-size=240","w");
-    struct sockaddr_storage peer_addr;
-    socklen_t peer_addr_len;
-    int nread;
-    char *buf = (char*)malloc(ptdata->msize * sizeof(char));
-    
-    printf("VoIP Server Running\n");
-    ptdata->rdy = 1;
-    for(;;)
-    {
-        peer_addr_len = sizeof(struct sockaddr_storage);
-        nread = recvfrom(ptdata->sfd, buf, ptdata->msize, 0, (struct sockaddr *) &peer_addr, &peer_addr_len);
-        if(nread == -1)
-            continue;
-        fwrite(buf, sizeof(char), ptdata->msize, pfd);
-        if(ptdata->testing)
-        {
-            printf("Sending message %d\n",++n);
-            fflush(stdout);
-        }
-    }
-}
-
+void *localServer(void *arg);
 void decode(struct parameters *, char**, int);
+void help();
 
 int main(int argc, char** argv)
 {
@@ -120,7 +94,7 @@ int main(int argc, char** argv)
     
     freeaddrinfo(result);
     ptdata->sfd = lsfd;
-    pthread_create(&pt, NULL, monServer, (void*)ptdata);   
+    pthread_create(&pt, NULL, localServer, (void*)ptdata);   
     
     while(! ptdata->rdy)
         usleep(1000);
@@ -180,6 +154,7 @@ int main(int argc, char** argv)
     return 0;
 }
 
+// Function to decode input parameters
 void decode(struct parameters *param, char **argv, int argc)
 {
     int i;
@@ -204,5 +179,50 @@ void decode(struct parameters *param, char **argv, int argc)
         
         if(!strcmp(*(argv + i), "-s"))
             param->msize = atoi(*(argv + i + 1));
+        
+        if(!strcmp(*(argv + i), "-h"))
+            help();
     }
+}
+
+// Local server for receiving audio
+void * localServer(void *arg)
+{
+    struct ptData *ptdata = (struct ptData*)arg;
+    int n = 0;
+    FILE *pfd;
+    pfd = popen("./decoder | aplay -c 1 -f S16_LE -r 8000 -F 30000 --period-size=6 --buffer-size=240","w");
+    struct sockaddr_storage peer_addr;
+    socklen_t peer_addr_len;
+    int nread;
+    char *buf = (char*)malloc(ptdata->msize * sizeof(char));
+    
+    printf("VoIP Server Running\n");
+    ptdata->rdy = 1;
+    for(;;)
+    {
+        peer_addr_len = sizeof(struct sockaddr_storage);
+        nread = recvfrom(ptdata->sfd, buf, ptdata->msize, 0, (struct sockaddr *) &peer_addr, &peer_addr_len);
+        if(nread == -1)
+            continue;
+        fwrite(buf, sizeof(char), ptdata->msize, pfd);
+        if(ptdata->testing)
+        {
+            printf("Sending message %d\n",++n);
+            fflush(stdout);
+        }
+    }
+}
+
+// Help
+void help()
+{
+    printf("OPTIONS\n");
+    printf("\t-lp  local port\n");
+    printf("\t-rp  remote port\n");
+    printf("\t-a   remote address\n");
+    printf("\t-s   msize\n");
+    printf("\t-t   running testing mode\n");
+    printf("\t-h   display this help\n");
+    exit(EXIT_SUCCESS);
 }
