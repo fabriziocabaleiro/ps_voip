@@ -31,6 +31,7 @@ struct ptData
 
 struct parameters
 {
+    char *prot;     // protocol
     char *br;       // sample bit rate
     char *audio;    // set audio program
     char *lport;    // local port
@@ -67,10 +68,13 @@ int main(int argc, char** argv)
     ptdata->audio = ps->audio;
     ptdata->br    = ps->br;
     char *voice = (char*)malloc(ps->msize * sizeof(char));
-    
+       
     memset(&hints, 0, sizeof(struct addrinfo));
     hints.ai_family    = AF_UNSPEC;               // Allow IPv4 or IPv6 
-    hints.ai_socktype  = SOCK_DGRAM;              // UDP 
+    if(!strcmp(ps->prot,"udp"))
+        hints.ai_socktype  = SOCK_DGRAM;          // UDP 
+    else
+        hints.ai_socktype  = SOCK_STREAM;         // TCP 
     hints.ai_flags     = AI_PASSIVE;              // For wildcard IP address   
     hints.ai_protocol  = 0;                       // Any protocol
     hints.ai_canonname = NULL;
@@ -175,6 +179,7 @@ void decode(struct parameters *param, char **argv, int argc)
     int i;
     param->wait  = 0;
     param->audio = (char*)"alsa";
+    param->prot  = (char*)"tcp";
     param->br    = (char*)"10000";
     param->addr  = NULL;
     param->lport = (char*)"6661";
@@ -194,6 +199,9 @@ void decode(struct parameters *param, char **argv, int argc)
         
         if(!strcmp(*(argv + i), "-r"))
             param->br = *(argv + i + 1);
+        
+        if(!strcmp(*(argv + i), "-p"))
+            param->prot = *(argv + i + 1);
         
         if(!strcmp(*(argv + i), "-t"))
             param->testing = 1;
@@ -258,6 +266,8 @@ void help()
     printf("\t-s     msize, this determinate the package size to be sent through internet\n");
     printf("\t-w     wait to the other person to start his server\n");
     printf("\t-au    select between alsa or sox\n");
+    printf("\t-r     set sample bit rate\n");
+    printf("\t-p     set communication protocol tcp/udp\n");
     printf("\t-t     running testing mode\n");
     printf("\t-h     display this help\n");
     printf("\n");
