@@ -20,6 +20,7 @@
 
 struct ptData
 {
+    char *prot;     // protocol
     char *br;       // sample bit rate
     int  sfd;       // socket file descriptor for server
     int  *wait;     // wait option to wait the other person to set his server
@@ -67,6 +68,8 @@ int main(int argc, char** argv)
     ptdata->rdy   = 0;
     ptdata->audio = ps->audio;
     ptdata->br    = ps->br;
+    ptdata->prot  = ps->prot;
+    
     char *voice = (char*)malloc(ps->msize * sizeof(char));
        
     memset(&hints, 0, sizeof(struct addrinfo));
@@ -180,7 +183,7 @@ void decode(struct parameters *param, char **argv, int argc)
     int i;
     param->wait  = 0;
     param->audio = (char*)"alsa";
-    param->prot  = (char*)"tcp";
+    param->prot  = (char*)"udp";
     param->br    = (char*)"10000";
     param->addr  = NULL;
     param->lport = (char*)"6661";
@@ -227,6 +230,7 @@ void * localServer(void *arg)
     char *cmd = (char*)malloc(200 * sizeof(char));
     struct ptData *ptdata = (struct ptData*)arg;
     int n = 0;
+    int session_fd;
     FILE *pfd;
     if(! strcmp(ptdata->audio,"alsa"))
         sprintf(cmd,"./decoder/decoder | aplay -c 1 -f S16_LE -r 8000 -B 30000",ptdata->br);
@@ -240,21 +244,39 @@ void * localServer(void *arg)
     
     printf("VoIP Server Running\n");
     ptdata->rdy = 1;
-    for(;;)
+    if(!strcmp(ptdata->prot,"udp"))
     {
-        peer_addr_len = sizeof(struct sockaddr_storage);
-        nread = recvfrom(ptdata->sfd, buf, ptdata->msize, 0, (struct sockaddr *) &peer_addr, &peer_addr_len);
-        if(nread == -1)
-            continue;
-        fwrite(buf, sizeof(char), ptdata->msize, pfd);
-        if(ptdata->testing)
+        for(;;)
         {
-            printf("Receiving message %d\n",++n);
-            fflush(pfd);
-            fflush(stdout);
+            peer_addr_len = sizeof(struct sockaddr_storage);
+            nread = recvfrom(ptdata->sfd, buf, ptdata->msize, 0, (struct sockaddr *) &peer_addr, &peer_addr_len);
+            if(nread == -1)
+                continue;
+            fwrite(buf, sizeof(char), ptdata->msize, pfd);
+            if(ptdata->testing)
+            {
+                printf("Receiving message %d\n",++n);
+                fflush(pfd);
+                fflush(stdout);
+            }
+            if(*ptdata->wait)
+                *ptdata->wait = 0;
         }
-        if(*ptdata->wait)
-            *ptdata->wait = 0;
+    }
+    else
+    {
+        listen(ptdata->sfd, 5);
+        session_fd = accept(ptdata->sfd, 0, 0);
+        if(session_fd == -1)
+            printf("Error trying to accept connection\n");
+        else
+        {
+            printf("A new VoIP chat has started\n");
+            while((n = recv(session_fd, buf, ptdata->msize, 0)) > 0)
+                fwrite(buf, sizeof(char), ptdata->msize, pfd);
+            printf("VoIP chat finished\n");
+
+        }
     }
 }
 
