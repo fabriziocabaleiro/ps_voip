@@ -110,6 +110,7 @@ int main(int argc, char* argv[]) {
 
         fwrite(encoded_data, sizeof (unsigned char), len, efileid);
         pli = 1;
+	fflush(NULL);
     }
     /* close files */
 

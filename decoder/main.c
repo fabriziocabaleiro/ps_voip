@@ -120,7 +120,7 @@ int main(int argc, char* argv[]) {
         len = decode(&Dec_Inst, decoded_data, encoded_data, pli);
         /* write output file */
         fwrite(decoded_data, sizeof (short), len, ofileid);
-        fflush(stderr);
+        fflush(NULL);
     }
 
     /* close files */
