@@ -6,7 +6,6 @@
  * Created on March 24, 2012, 4:08 PM
  */
 
-#include <cstdlib> 
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -108,7 +107,8 @@ int main(int argc, char** argv)
         exit(EXIT_FAILURE);
     }
     
-    freeaddrinfo(result);
+    if(!strcmp(ps->prot,"udp")) // if using UDP
+        freeaddrinfo(result);
     ptdata->sfd = lsfd;
     pthread_create(&pt, NULL, localServer, (void*)ptdata);   
     
@@ -167,8 +167,8 @@ int main(int argc, char** argv)
             {
                 printf("sending voip %d\n", n++);
                 fflush(stdout);
-                fflush(pfd);
             }
+            fflush(pfd);
             send(rsfd, voice, ps->msize, 0);
         }
 
@@ -230,13 +230,13 @@ void * localServer(void *arg)
     char *cmd = (char*)malloc(200 * sizeof(char));
     struct ptData *ptdata = (struct ptData*)arg;
     int n = 0;
+    int first = 1;
     int session_fd;
     FILE *pfd;
     if(! strcmp(ptdata->audio,"alsa"))
         sprintf(cmd,"./decoder/decoder | aplay -c 1 -f S16_LE -r 8000 -B 30000",ptdata->br);
     else if(! strcmp(ptdata->audio,"sox"))
         sprintf(cmd,"play -q -r %s -",ptdata->br);
-    pfd = popen(cmd,"w");
     struct sockaddr_storage peer_addr;
     socklen_t peer_addr_len;
     int nread;
@@ -252,13 +252,18 @@ void * localServer(void *arg)
             nread = recvfrom(ptdata->sfd, buf, ptdata->msize, 0, (struct sockaddr *) &peer_addr, &peer_addr_len);
             if(nread == -1)
                 continue;
+            if(first)
+            {
+                pfd = popen(cmd,"w");
+                first = 0;
+            }
             fwrite(buf, sizeof(char), ptdata->msize, pfd);
             if(ptdata->testing)
             {
                 printf("Receiving message %d\n",++n);
-                fflush(pfd);
                 fflush(stdout);
             }
+            fflush(pfd);
             if(*ptdata->wait)
                 *ptdata->wait = 0;
         }
@@ -273,7 +278,14 @@ void * localServer(void *arg)
         {
             printf("A new VoIP chat has started\n");
             while((n = recv(session_fd, buf, ptdata->msize, 0)) > 0)
+            {
+                if(first)
+                {
+                    pfd = popen(cmd,"w");
+                    first = 0;
+                }
                 fwrite(buf, sizeof(char), ptdata->msize, pfd);
+            }
             printf("VoIP chat finished\n");
 
         }
