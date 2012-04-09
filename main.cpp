@@ -254,7 +254,7 @@ void * localServer(void *arg)
                 printf("Receiving message %d\n",++n);
             if(*ptdata->wait)
                 *ptdata->wait = 0;
-            fflush(NULL);
+            fflush(NULL); // flush
         }
     }
     else
