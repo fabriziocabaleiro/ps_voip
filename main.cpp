@@ -164,12 +164,9 @@ int main(int argc, char** argv)
         {
             fread(voice, sizeof(char), ps->msize, pfd);
             if(ps->testing)
-            {
                 printf("sending voip %d\n", n++);
-                fflush(stdout);
-                fflush(pfd);
-            }
             send(rsfd, voice, ps->msize, 0);
+            fflush(NULL);
         }
 
     }
@@ -254,13 +251,10 @@ void * localServer(void *arg)
                 continue;
             fwrite(buf, sizeof(char), ptdata->msize, pfd);
             if(ptdata->testing)
-            {
                 printf("Receiving message %d\n",++n);
-                fflush(pfd);
-                fflush(stdout);
-            }
             if(*ptdata->wait)
                 *ptdata->wait = 0;
+            fflush(NULL);
         }
     }
     else
@@ -273,9 +267,11 @@ void * localServer(void *arg)
         {
             printf("A new VoIP chat has started\n");
             while((n = recv(session_fd, buf, ptdata->msize, 0)) > 0)
+            {
                 fwrite(buf, sizeof(char), ptdata->msize, pfd);
+                fflush(NULL);
+            }
             printf("VoIP chat finished\n");
-
         }
     }
 }
