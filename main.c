@@ -1,5 +1,5 @@
 /* 
- * File:   main.cpp
+ * File:   main.c
  * Author: Fabrizio Cabaleiro
  * VoIP, system programming project
  * 

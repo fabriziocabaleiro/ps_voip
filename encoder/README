@@ -1,0 +1,24 @@
+******************************************************************
+*                                                                *
+*    iLBC Speech Coder ANSI-C Source Code                        *
+*                                                                *
+*    files.x                                                     *
+*                                                                *
+*    Copyright (C) The Internet Society (2004).                  *
+*    All Rights Reserved.                                        *
+*                                                                *
+******************************************************************
+
+Los códigos fuentes encontrados en este directorio no fueron desarrollados mayoritariamente por el grupo
+de desarrollo de D-Light VoIP.
+
+Estos códigos fuentes no venían con un Makefile, por lo que se uso la herramienta entregada por QT llamada
+"qmake", para generar un makefile usando qmake los comandos a seguir son:
+
+  $  qmake -project
+
+  $  qmake -makefile
+
+Luego para compilar:
+
+  $  make

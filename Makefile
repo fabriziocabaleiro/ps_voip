@@ -1,2 +1,2 @@
-voip: main.cpp
-	g++ main.cpp -o voip -pthread
+voip: main.c
+	gcc main.c -o voip -pthread
