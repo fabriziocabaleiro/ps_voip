@@ -1,20 +1,16 @@
-                                             ************************************************
-                                             *                                              *
-                                             *  D-Light VoIP                                *
-                                             *                                              *
-                                             *  Equipo                                      *
-                                             *         Fabrizio Cabaleiro                   *
-                                             *         Gabriel Juri                         *
-                                             *         Carlos Ibañes                        *
-                                             *                                              *
-                                             ************************************************
+D-Light VoIP
 
+Team members:
+  Fabrizio Cabaleiro
+  Carlos Ibañes
+  Gabriel Juri
 
-Para compilar D-Light VoIP estando en su emulador de terminal preferido, valla hacia la ruta en donde se encuentran este mismo 
-archivo, luego ejecute el comando:
+D-Light VoIP is a Voice over IP light program, 
+it doesn't need to have a user account or to
+enter any other information, you only have to
+know your IP address and the IP address of the
+person that you want to speek to.
 
-  $  make
-
-Esto compilara el modulo principal del proyecto, luego para usar los programas de alsa para el modulo de sonido, tiene que ir
-a los directorios encode y decode y leer los README correspondientes. En el caso de usar el programa sox para el sonido, tiene
-que tener el paquete sox instalado.
+D-Light VoIP is not for the regular computer
+user, it is designed to be not easy to use
+but fast and light.
